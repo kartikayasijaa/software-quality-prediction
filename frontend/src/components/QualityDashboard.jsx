@@ -21,6 +21,8 @@ import {
   Cell,
 } from "recharts";
 import { SunIcon, MoonIcon } from "./Icons";
+import ScoreDistributionChart from "./ScoreDistributionChart";
+import ScoreExplanation from "./ScoreExplanation";
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8"];
 const RADAR_COLORS = {
@@ -491,6 +493,11 @@ const QualityDashboard = () => {
                     </div>
                   ))}
                 </div>
+
+                {/* Add the Score Distribution Chart here */}
+                <div className="mt-6">
+                  <ScoreDistributionChart scores={repositoryData.scores} />
+                </div>
               </div>
             </div>
           </div>
@@ -706,6 +713,15 @@ const QualityDashboard = () => {
                       />
                     </PieChart>
                   </ResponsiveContainer>
+
+                  {/* Add Score Explanation component here */}
+                  {repositoryData.features && (
+                    <ScoreExplanation
+                      dimension={selectedMetric}
+                      score={repositoryData.scores[selectedMetric]}
+                      features={repositoryData.features}
+                    />
+                  )}
                 </div>
               )}
             </div>

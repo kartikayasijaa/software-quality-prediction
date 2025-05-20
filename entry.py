@@ -125,6 +125,7 @@ def analyze_repository():
             'overall_score': overall_score,
             'scores': predictions,
             'key_metrics': key_metrics,
+            'features': features,
             'recommendations': recommendations,
             'history': history,
             'feature_importance': feature_importance
@@ -136,72 +137,146 @@ def analyze_repository():
 
 def generate_synthetic_scores(features):
     """Generate synthetic quality scores based on extracted features."""
-    # Default weights for each dimension
+    # Feature normalization ranges - these values define min/max expected values
+    feature_ranges = {
+        'complexity': (0, 150),  # 0 is best, 150 is worst
+        'comment_ratio': (0, 0.4),  # 0.4 is best, 0 is worst
+        'maintainability_index': (0, 100),  # 100 is best, 0 is worst
+        'circular_dependencies': (0, 30),  # 0 is best, 30 is worst
+        'lint_errors': (0, 100),  # 0 is best, 100 is worst
+        'test_to_code_ratio': (0, 1.0),  # 1.0 is best, 0 is worst
+        'test_frameworks_count': (0, 5),  # More is better
+        'avg_dependencies': (0, 30),  # Lower is better for maintainability
+        'avg_fan_out': (0, 20),  # Lower is better for scalability
+        'dependency_count': (0, 100),  # Context-dependent
+        'has_dependency_management': (0, 1),  # Boolean
+        'avg_function_complexity': (0, 30),  # Lower is better
+        'loc': (0, 10000)  # Context-dependent
+    }
+    
     weights = {
         'maintainability': {
-            'complexity': -0.3,
-            'comment_ratio': 0.2,
-            'maintainability_index': 0.3,
-            'circular_dependencies': -0.2,
-            'lint_errors': -0.2
+            'complexity': -0.25,
+            'comment_ratio': 0.20,
+            'maintainability_index': 0.25,
+            'circular_dependencies': -0.15,
+            'lint_errors': -0.15
         },
         'reliability': {
-            'test_to_code_ratio': 0.3,
-            'test_frameworks_count': 0.2,
-            'lint_errors': -0.2,
-            'complexity': -0.2
+            'test_to_code_ratio': 0.35,
+            'test_frameworks_count': 0.15,
+            'lint_errors': -0.20,
+            'complexity': -0.20,
+            'circular_dependencies': -0.10
         },
         'scalability': {
             'avg_fan_out': -0.25,
-            'circular_dependencies': -0.3,
-            'avg_dependencies': -0.2,
-            'complexity': -0.25
+            'circular_dependencies': -0.30,
+            'avg_dependencies': -0.20,
+            'complexity': -0.15,
+            'loc': -0.10
         },
         'security': {
-            'dependency_count': -0.15,
-            'has_dependency_management': 0.3,
-            'lint_errors': -0.2,
-            'test_to_code_ratio': 0.2
+            'dependency_count': -0.10,
+            'has_dependency_management': 0.35,
+            'lint_errors': -0.25,
+            'test_to_code_ratio': 0.15,
+            'complexity': -0.15
         },
         'efficiency': {
-            'complexity': -0.3,
-            'avg_function_complexity': -0.3,
-            'loc': -0.2
+            'complexity': -0.30,
+            'avg_function_complexity': -0.25,
+            'loc': -0.15,
+            'circular_dependencies': -0.15,
+            'maintainability_index': 0.15
         }
     }
     
-    # Initialize scores with base values
     scores = {
-        'maintainability': 0.5,
-        'reliability': 0.5,
-        'scalability': 0.5,
-        'security': 0.5,
-        'efficiency': 0.5
+        'maintainability': 0.3,
+        'reliability': 0.3,
+        'scalability': 0.3,
+        'security': 0.3,
+        'efficiency': 0.3
     }
+    
+    import random
+    random.seed(hash(str(features.get('file_count', 0)) + str(features.get('total_loc', 0))))
+    
+    for dimension in scores:
+        scores[dimension] += random.uniform(-0.05, 0.05)
     
     # Apply weights to features for each dimension
     for dimension, feature_weights in weights.items():
         for feature, weight in feature_weights.items():
-            if feature in features:
-                # Normalize the feature value
+            if feature in features and feature in feature_ranges:
                 value = features[feature]
+                
                 if isinstance(value, (int, float)):
-                    # Apply the weight
+                    min_val, max_val = feature_ranges[feature]
+                    
                     if feature == 'has_dependency_management':
-                        # Boolean feature
                         scores[dimension] += weight * (1 if value else 0)
-                    elif feature in ['complexity', 'lint_errors', 'circular_dependencies']:
-                        # Features where lower is better
-                        normalized = max(0, 1 - (value / 100))  # Assuming max value of 100
-                        scores[dimension] += weight * normalized
+                        
+                    elif feature in ['complexity', 'lint_errors', 'circular_dependencies', 'avg_fan_out', 
+                                   'avg_dependencies', 'dependency_count', 'avg_function_complexity']:
+                        # Features where lower is better (inverse relationship)
+                        if max_val > min_val:
+                            # Normalize to 0-1 range and invert (1 is best)
+                            normalized = 1 - min(1, max(0, (value - min_val) / (max_val - min_val)))
+                            scores[dimension] += weight * normalized
+                            
                     else:
-                        # Features where higher is better
-                        normalized = min(1, value)
-                        scores[dimension] += weight * normalized
+                        # Features where higher is better (direct relationship)
+                        if max_val > min_val:
+                            # Normalize to 0-1 range (1 is best)
+                            normalized = min(1, max(0, (value - min_val) / (max_val - min_val)))
+                            scores[dimension] += weight * normalized
     
-    # Ensure scores are between 0 and 1
+
+    if features.get('circular_dependencies', 0) > 15:
+        scores['maintainability'] -= 0.15
+        scores['scalability'] -= 0.20
+    
+    if features.get('test_to_code_ratio', 0) < 0.2:
+        scores['reliability'] -= 0.15
+        scores['security'] -= 0.10
+    
+    if features.get('complexity', 0) > 100:
+        scores['maintainability'] -= 0.15
+        scores['efficiency'] -= 0.15
+    
+    if features.get('lint_errors', 0) > 50:
+        scores['reliability'] -= 0.10
+        scores['security'] -= 0.15
+
+
+    if (features.get('maintainability_index', 0) > 70 and 
+        features.get('complexity', 0) < 50 and 
+        features.get('comment_ratio', 0) > 0.2):
+        scores['maintainability'] += 0.1
+    
+
+    if (features.get('test_to_code_ratio', 0) > 0.5 and 
+        features.get('test_frameworks_count', 0) > 1):
+        scores['reliability'] += 0.15
+    
     for dimension in scores:
-        scores[dimension] = max(0, min(1, scores[dimension]))
+        scores[dimension] = max(0.1, min(0.95, scores[dimension]))
+    
+    for dimension in scores:
+        scores[dimension] += random.uniform(-0.03, 0.03)
+        scores[dimension] = max(0.1, min(0.95, scores[dimension]))
+    
+    for dimension in scores:
+        top_features = sorted(
+            [(feature, abs(weight)) for feature, weight in weights[dimension].items() if feature in features],
+            key=lambda x: x[1],
+            reverse=True
+        )[:3]
+        
+        feature_values = ", ".join([f"{feat}: {features.get(feat, 'N/A')}" for feat, _ in top_features])
+        print(f"{dimension.title()} score ({scores[dimension]:.2f}) influenced by: {feature_values}")
     
     return scores
 
