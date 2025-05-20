@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  # Backend Flask API
+  backend:
+    build:
+      context: .
+      dockerfile: backend.Dockerfile
+    container_name: code-quality-backend
+    volumes:
+      - ./data:/app/data
+      - ./src:/app/src
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_APP=entry.py
+    command: python entry.py
+    networks:
+      - code-quality-network
+
+  # Frontend React App
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: frontend.Dockerfile
+    container_name: code-quality-frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - WDS_SOCKET_PORT=0
+      - REACT_APP_API_URL=http://localhost:5000
+    networks:
+      - code-quality-network
+
+networks:
+  code-quality-network:
+    driver: bridge

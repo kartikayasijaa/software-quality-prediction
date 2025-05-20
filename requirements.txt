@@ -1,0 +1,13 @@
+numpy>=1.20.0
+pandas>=1.3.0
+scikit-learn>=1.0.0
+joblib>=1.1.0
+matplotlib>=3.4.0
+seaborn>=0.11.0
+radon>=5.1.0
+pylint>=2.15.0  # Updated version where epylint is removed
+lizard>=1.17.0
+gitpython>=3.1.0
+pydriller>=2.0.0
+Flask>=2.0.0
+Flask-Cors>=3.0.10
